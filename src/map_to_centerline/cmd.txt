@@ -1,0 +1,5 @@
+# 執行此命令生成csv
+python3 /root/ros2_foxy/install/map_to_centerline/lib/map_to_centerline/generate_centerline
+
+# --ros-args 可根據需求修改 map, yaml, csv 的路徑
+python3 /root/ros2_foxy/install/map_to_centerline/lib/map_to_centerline/generate_centerline --ros-args \ -p yaml_path:=/path/to/your/new_map.yaml \ -p png_path:=/path/to/your/new_map.pgm \ -p output_csv:=/path/to/waypoints/path.csv

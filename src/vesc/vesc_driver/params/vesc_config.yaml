@@ -1,0 +1,36 @@
+/**:
+  ros__parameters:
+    # --- 連接設定 ---
+    port: "/dev/ttyACM1"
+    
+    # --- 座標系設定 ---
+    imu_frame_id: "imu"
+    frame_id: "base_link"       # 通常 vesc_driver 作為車輛主體使用 base_link
+    
+    # --- 速度指令限制 (ERPM) ---
+    # 這裡放開了限制，避免出現 "clipping" 錯誤
+    speed_max: 23250.0
+    speed_min: -23250.0
+    
+    # --- 舵機指令限制 (0.0 ~ 1.0) ---
+    # 0.5 通常是正中間，0.15~0.85 是為了保護硬體不轉到底卡死
+    servo_max: 0.85
+    servo_min: 0.15
+    
+    # --- 煞車指令限制 ---
+    brake_max: 20000.0
+    brake_min: 0.0
+    
+    # --- 電流指令限制 (安培) ---
+    current_max: 100.0
+    current_min: 0.0
+    
+    # --- 占空比限制 (0.0 ~ 1.0) ---
+    # 如果你要用 duty_cycle 控制，這裡不能是 0
+    duty_cycle_max: 1.0
+    duty_cycle_min: -1.0
+    
+    # --- 位置控制限制 ---
+    # 如果沒有用到位置控制，可以維持較小範圍或設大
+    position_max: 1000000.0
+    position_min: -1000000.0
