@@ -207,16 +207,14 @@ void VescDriver::vescPacketCallback(const std::shared_ptr<VescPacket const> & pa
 
     auto imu_msg = VescImuStamped();
     auto std_imu_msg = Imu();
-    //imu_msg.header.stamp = now();
-    //std_imu_msg.header.stamp = now();
-    // --- 修改開始：統一使用一個時間戳 ---
-    auto now_time = this->now(); 
+    // Use one timestamp for the custom and standard IMU messages so downstream
+    // consumers can align the two representations of the same VESC sample.
+    const auto now_time = this->now();
     imu_msg.header.stamp = now_time;
     std_imu_msg.header.stamp = now_time;
-    // --- 修改結束 ---
-    
-    imu_msg.header.frame_id = "imu";      // 加這行
-    std_imu_msg.header.frame_id = "imu";  // 加這行
+
+    imu_msg.header.frame_id = "imu";
+    std_imu_msg.header.frame_id = "imu";
 
     imu_msg.imu.ypr.x = imuData->roll();
     imu_msg.imu.ypr.y = imuData->pitch();
@@ -239,13 +237,18 @@ void VescDriver::vescPacketCallback(const std::shared_ptr<VescPacket const> & pa
     imu_msg.imu.orientation.y = imuData->q_y();
     imu_msg.imu.orientation.z = imuData->q_z();
 
-    std_imu_msg.linear_acceleration.x = imuData->acc_x();
-    std_imu_msg.linear_acceleration.y = imuData->acc_y();
-    std_imu_msg.linear_acceleration.z = imuData->acc_z();
+    // sensor_msgs/Imu requires acceleration in m/s^2 and angular velocity in
+    // rad/s. The VESC reports these fields in g and deg/s respectively.
+    constexpr double kStandardGravity = 9.80665;
+    constexpr double kDegreesToRadians = 0.017453292519943295;
 
-    std_imu_msg.angular_velocity.x = imuData->gyr_x();
-    std_imu_msg.angular_velocity.y = imuData->gyr_y();
-    std_imu_msg.angular_velocity.z = imuData->gyr_z();
+    std_imu_msg.linear_acceleration.x = imuData->acc_x() * kStandardGravity;
+    std_imu_msg.linear_acceleration.y = imuData->acc_y() * kStandardGravity;
+    std_imu_msg.linear_acceleration.z = imuData->acc_z() * kStandardGravity;
+
+    std_imu_msg.angular_velocity.x = imuData->gyr_x() * kDegreesToRadians;
+    std_imu_msg.angular_velocity.y = imuData->gyr_y() * kDegreesToRadians;
+    std_imu_msg.angular_velocity.z = imuData->gyr_z() * kDegreesToRadians;
 
     std_imu_msg.orientation.w = imuData->q_w();
     std_imu_msg.orientation.x = imuData->q_x();

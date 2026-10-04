@@ -22,11 +22,11 @@ def generate_launch_description():
             '-configuration_directory', lua_config_path,
             '-configuration_basename', 'hokuyo_2d.lua'
         ],
-        # 💡 重要：這裡進行 Topic 對接
+        # Connect the physical sensor topics to Cartographer's expected names.
         remappings=[
-	    ('scan', '/scan'),
-	    ('imu', '/imu/data_fixed')
-	]
+            ('scan', '/scan'),
+            ('imu', '/sensors/imu/raw'),
+        ]
     )
 
     # 3. 定義地圖節點 (Occupancy Grid)，負責將 SLAM 結果轉為常見的 2D 柵格地圖

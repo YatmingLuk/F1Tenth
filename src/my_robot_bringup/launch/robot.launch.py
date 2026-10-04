@@ -1,9 +1,8 @@
-import os
 from launch import LaunchDescription
 from launch_ros.actions import Node
 
 def generate_launch_description():
-    # 1. VESC 驅動
+    # The VESC driver is normally started separately; see docs/OPERATIONS.md.
     vesc_driver = Node(
         package='vesc_driver',
         executable='vesc_driver_node',
@@ -20,20 +19,20 @@ def generate_launch_description():
         }]
     )
 
-	# 2. Hokuyo 雷達驅動
+    # Hokuyo LiDAR driver.
     urg_node = Node(
         package='urg_node',
         executable='urg_node_driver',
         name='urg_node',
         parameters=[{
             'serial_port': '/dev/sensors/hokuyo', 
-            # 暫時拿掉 frame_id 設定，讓它噴它最想噴的 laser
+            # Keep the driver's native "laser" frame.
         }],
         remappings=[
             ('scan', '/scan'), 
         ]
     )
-    # 3. 靜態座標轉換：ego_racecar/base_link -> ego_racecar/laser
+    # Static transform: base_link -> laser.
     static_tf_base_to_laser = Node(
         package='tf2_ros',
         executable='static_transform_publisher',
@@ -41,7 +40,8 @@ def generate_launch_description():
         arguments=['0.11', '0', '0.12', '0', '0', '0', 'base_link', 'laser']
     )
     
-    # 4. 靜態座標轉換：ego_racecar/base_link -> imu
+    # Static transform: base_link -> imu. The translation matches the current
+    # vehicle installation; verify the rotation against the physical mounting.
     static_tf_base_to_imu = Node(
         package='tf2_ros',
         executable='static_transform_publisher',
@@ -50,8 +50,8 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
- #       vesc_driver,
+        # vesc_driver,
         urg_node,
         static_tf_base_to_laser,
- #       static_tf_base_to_imu
+        static_tf_base_to_imu,
     ])

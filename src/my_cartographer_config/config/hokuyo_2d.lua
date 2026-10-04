@@ -5,7 +5,7 @@ options = {
   map_builder = MAP_BUILDER,
   trajectory_builder = TRAJECTORY_BUILDER,
   map_frame = "map",
-  tracking_frame = "base_link",  -- imu / base_link
+  tracking_frame = "imu",
   published_frame = "base_link",
   odom_frame = "odom",
   provide_odom_frame = true,
@@ -37,7 +37,7 @@ TRAJECTORY_BUILDER_2D.num_accumulated_range_data = 2  -- 累積 2 幀，增加�
 -- 強制提高雷達在優化中的權重
 TRAJECTORY_BUILDER_2D.ceres_scan_matcher.occupied_space_weight = 10.  -- (原本 1.) 強制算法一定要對齊地圖
 TRAJECTORY_BUILDER_2D.real_time_correlative_scan_matcher.translation_delta_cost_weight = 100. -- (原本 10) 降低對馬達偏移的信任
-TRAJECTORY_BUILDER_2D.use_imu_data = false -- IMU 開關
+TRAJECTORY_BUILDER_2D.use_imu_data = true
 TRAJECTORY_BUILDER_2D.use_online_correlative_scan_matching = true  -- 利用laser scan matching
 
 -- 先把 POSE_GRAPH.optimization_problem 全部註解掉，讓它用預設值
