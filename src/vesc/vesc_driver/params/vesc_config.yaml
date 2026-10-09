@@ -1,6 +1,8 @@
 /**:
   ros__parameters:
     # --- 連接設定 ---
+    # Legacy default. Identify the device before launching; prefer a verified /dev/serial/by-id path.
+    # Override with: ros2 launch vesc_driver vesc_driver_node.launch.py port:=<verified-path>
     port: "/dev/ttyACM1"
     
     # --- 座標系設定 ---

@@ -156,3 +156,58 @@ ros2 run car_control pure_pursuit_tf
 | Cartographer has no IMU subscription | `ros2 node info /cartographer_node` | Confirm the IMU remap and `use_imu_data = true` |
 | No `/map` output | Cartographer logs and sensor rates | Restore `/scan`, IMU, and required TF inputs |
 | Vehicle does not respond | VESC driver, bridge, and topic remap | Confirm both control nodes are active |
+
+## Weekly follow-up: USB, low-speed odometry, and TF
+
+The [October 5-10 weekly record](research/2026-10-10-weekly-improvements.md) contains
+the architecture, code locations, reasons, full code diffs, historical measurements,
+and the next Cartographer-only velocity experiment.
+
+Before starting VESC, identify its USB device rather than assuming `ttyACM1`:
+
+```bash
+lsusb
+ls -l /dev/serial/by-id/ /dev/serial/by-path/
+readlink -f /dev/sensors/hokuyo
+udevadm info --query=property --name=/dev/ttyACM1
+```
+
+Match the identity and physical device to VESC, then use its confirmed stable path:
+
+```bash
+VESC_PORT='/dev/serial/by-id/<confirmed-vesc-device>'
+ros2 launch vesc_driver vesc_driver_node.launch.py port:="$VESC_PORT"
+```
+
+Omitting `port` preserves the port in the selected YAML; `config:=...` continues to work.
+Do not run `vesc_full_bridge.py` or VESC Tool against the same USB device while the C++
+driver is active. The repository udev helper/rules require installation and a verified
+device identity before use.
+
+For VESC speed comparison, use a file containing measured `speed_to_erpm_gain` and
+`speed_to_erpm_offset`, publish odometry on its own topic, and disable its TF:
+
+```bash
+ros2 run vesc_ackermann vesc_to_odom_node --ros-args \
+  --params-file vesc_odom_calibrated.yaml \
+  -p speed_deadband:=0.05 -p publish_tf:=false \
+  -p use_servo_cmd_to_calc_angular_velocity:=false \
+  -r odom:=/vesc/odom
+```
+
+This speed-only mode avoids waiting for a servo command; it does not estimate steering
+angular velocity. Compare a second run with `speed_deadband:=0.0` after stopping the first
+node. The default remains 0.05 m/s. The existing XML launch uses placeholder calibration
+and enables TF, so use the explicit command above for this experiment.
+
+Cartographer currently owns `map -> odom -> base_link` with `use_odometry = false`.
+Confirm both links independently:
+
+```bash
+ros2 run tf2_ros tf2_echo map odom
+ros2 run tf2_ros tf2_echo odom base_link
+```
+
+The planned velocity node will differentiate timestamped poses in the continuous `odom`
+frame. Global `map` corrections must be monitored separately; a TF publication timer is
+not evidence of independent sensor measurements at that frequency.
