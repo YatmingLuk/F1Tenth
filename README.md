@@ -152,6 +152,7 @@ were validated on the physical vehicle under Linux; the velocity estimator is a 
 
 The detailed October 1, 2026 experiment log is available as a
 [Personal Research Journal PDF](docs/research/2026-10-01-personal-research-journal.pdf).
+
 The detailed October 10, 2026 experiment log is available as a
 [Personla Research Journal md](docs/research/2026-10-10-weekly-improvements.md)
 ## Contributors
