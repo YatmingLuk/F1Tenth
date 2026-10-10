@@ -67,6 +67,11 @@ VescDriver::VescDriver(const rclcpp::NodeOptions & options)
 {
   // get vesc serial port address
   std::string port = declare_parameter<std::string>("port", "");
+  // An explicit launch override wins; an empty override retains the YAML configuration.
+  const auto port_override = declare_parameter<std::string>("port_override", "");
+  if (!port_override.empty()) {
+    port = port_override;
+  }
 
   // attempt to connect to the serial port
   try {

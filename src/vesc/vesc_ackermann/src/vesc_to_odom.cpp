@@ -31,6 +31,7 @@
 #include "vesc_ackermann/vesc_to_odom.hpp"
 
 #include <cmath>
+#include <stdexcept>
 #include <string>
 
 #include <geometry_msgs/msg/transform_stamped.hpp>
@@ -62,6 +63,11 @@ VescToOdom::VescToOdom(const rclcpp::NodeOptions & options)
 
   speed_to_erpm_gain_ = declare_parameter<double>("speed_to_erpm_gain");
   speed_to_erpm_offset_ = declare_parameter<double>("speed_to_erpm_offset");
+  // Preserve the previous 0.05 m/s threshold; set to zero for low-speed comparisons.
+  speed_deadband_ = declare_parameter<double>("speed_deadband", 0.05);
+  if (!std::isfinite(speed_deadband_) || speed_deadband_ < 0.0) {
+    throw std::invalid_argument("speed_deadband must be finite and non-negative (m/s)");
+  }
 
   if (use_servo_cmd_) {
     steering_to_servo_gain_ =
@@ -100,7 +106,7 @@ void VescToOdom::vescStateCallback(const VescStateStamped::SharedPtr state)
 
   // convert to engineering units
   double current_speed = (-state->state.speed - speed_to_erpm_offset_) / speed_to_erpm_gain_;
-  if (std::fabs(current_speed) < 0.05) {
+  if (std::fabs(current_speed) < speed_deadband_) {
     current_speed = 0.0;
   }
   double current_steering_angle(0.0), current_angular_velocity(0.0);

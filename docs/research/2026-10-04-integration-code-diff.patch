@@ -1,0 +1,153 @@
+# Existing integration commit: d6d957915434ac9c98d30c643afe6ebab978469e
+# Parent: 6139eaaccef8a1e5a276b68332e7864092ad1ba4
+# Source-code changes only; already present on main before the weekly PR.
+diff --git a/src/my_cartographer_config/config/hokuyo_2d.lua b/src/my_cartographer_config/config/hokuyo_2d.lua
+--- a/src/my_cartographer_config/config/hokuyo_2d.lua
++++ b/src/my_cartographer_config/config/hokuyo_2d.lua
+@@ -5,7 +5,7 @@ options = {
+   map_builder = MAP_BUILDER,
+   trajectory_builder = TRAJECTORY_BUILDER,
+   map_frame = "map",
+-  tracking_frame = "base_link",  -- imu / base_link
++  tracking_frame = "imu",
+   published_frame = "base_link",
+   odom_frame = "odom",
+   provide_odom_frame = true,
+@@ -37,7 +37,7 @@ TRAJECTORY_BUILDER_2D.num_accumulated_range_data = 2  -- 累積 2 幀，增加
+ -- 強制提高雷達在優化中的權重
+ TRAJECTORY_BUILDER_2D.ceres_scan_matcher.occupied_space_weight = 10.  -- (原本 1.) 強制算法一定要對齊地圖
+ TRAJECTORY_BUILDER_2D.real_time_correlative_scan_matcher.translation_delta_cost_weight = 100. -- (原本 10) 降低對馬達偏移的信任
+-TRAJECTORY_BUILDER_2D.use_imu_data = false -- IMU 開關
++TRAJECTORY_BUILDER_2D.use_imu_data = true
+ TRAJECTORY_BUILDER_2D.use_online_correlative_scan_matching = true  -- 利用laser scan matching
+ 
+ -- 先把 POSE_GRAPH.optimization_problem 全部註解掉，讓它用預設值
+diff --git a/src/my_cartographer_config/launch/cartographer.launch.py b/src/my_cartographer_config/launch/cartographer.launch.py
+--- a/src/my_cartographer_config/launch/cartographer.launch.py
++++ b/src/my_cartographer_config/launch/cartographer.launch.py
+@@ -22,11 +22,11 @@ def generate_launch_description():
+             '-configuration_directory', lua_config_path,
+             '-configuration_basename', 'hokuyo_2d.lua'
+         ],
+-        # 💡 重要：這裡進行 Topic 對接
++        # Connect the physical sensor topics to Cartographer's expected names.
+         remappings=[
+-	    ('scan', '/scan'),
+-	    ('imu', '/imu/data_fixed')
+-	]
++            ('scan', '/scan'),
++            ('imu', '/sensors/imu/raw'),
++        ]
+     )
+ 
+     # 3. 定義地圖節點 (Occupancy Grid)，負責將 SLAM 結果轉為常見的 2D 柵格地圖
+diff --git a/src/my_robot_bringup/launch/robot.launch.py b/src/my_robot_bringup/launch/robot.launch.py
+--- a/src/my_robot_bringup/launch/robot.launch.py
++++ b/src/my_robot_bringup/launch/robot.launch.py
+@@ -1,9 +1,8 @@
+-import os
+ from launch import LaunchDescription
+ from launch_ros.actions import Node
+ 
+ def generate_launch_description():
+-    # 1. VESC 驅動
++    # The VESC driver is normally started separately; see docs/OPERATIONS.md.
+     vesc_driver = Node(
+         package='vesc_driver',
+         executable='vesc_driver_node',
+@@ -20,28 +19,29 @@ def generate_launch_description():
+         }]
+     )
+ 
+-	# 2. Hokuyo 雷達驅動
++    # Hokuyo LiDAR driver.
+     urg_node = Node(
+         package='urg_node',
+         executable='urg_node_driver',
+         name='urg_node',
+         parameters=[{
+             'serial_port': '/dev/sensors/hokuyo', 
+-            # 暫時拿掉 frame_id 設定，讓它噴它最想噴的 laser
++            # Keep the driver's native "laser" frame.
+         }],
+         remappings=[
+             ('scan', '/scan'), 
+         ]
+     )
+-    # 3. 靜態座標轉換：ego_racecar/base_link -> ego_racecar/laser
++    # Static transform: base_link -> laser.
+     static_tf_base_to_laser = Node(
+         package='tf2_ros',
+         executable='static_transform_publisher',
+         name='base_link_to_laser',
+         arguments=['0.11', '0', '0.12', '0', '0', '0', 'base_link', 'laser']
+     )
+     
+-    # 4. 靜態座標轉換：ego_racecar/base_link -> imu
++    # Static transform: base_link -> imu. The translation matches the current
++    # vehicle installation; verify the rotation against the physical mounting.
+     static_tf_base_to_imu = Node(
+         package='tf2_ros',
+         executable='static_transform_publisher',
+@@ -50,8 +50,8 @@ def generate_launch_description():
+     )
+ 
+     return LaunchDescription([
+- #       vesc_driver,
++        # vesc_driver,
+         urg_node,
+         static_tf_base_to_laser,
+- #       static_tf_base_to_imu
++        static_tf_base_to_imu,
+     ])
+diff --git a/src/vesc/vesc_driver/src/vesc_driver.cpp b/src/vesc/vesc_driver/src/vesc_driver.cpp
+--- a/src/vesc/vesc_driver/src/vesc_driver.cpp
++++ b/src/vesc/vesc_driver/src/vesc_driver.cpp
+@@ -207,16 +207,14 @@ void VescDriver::vescPacketCallback(const std::shared_ptr<VescPacket const> & pa
+ 
+     auto imu_msg = VescImuStamped();
+     auto std_imu_msg = Imu();
+-    //imu_msg.header.stamp = now();
+-    //std_imu_msg.header.stamp = now();
+-    // --- 修改開始：統一使用一個時間戳 ---
+-    auto now_time = this->now(); 
++    // Use one timestamp for the custom and standard IMU messages so downstream
++    // consumers can align the two representations of the same VESC sample.
++    const auto now_time = this->now();
+     imu_msg.header.stamp = now_time;
+     std_imu_msg.header.stamp = now_time;
+-    // --- 修改結束 ---
+-    
+-    imu_msg.header.frame_id = "imu";      // 加這行
+-    std_imu_msg.header.frame_id = "imu";  // 加這行
++
++    imu_msg.header.frame_id = "imu";
++    std_imu_msg.header.frame_id = "imu";
+ 
+     imu_msg.imu.ypr.x = imuData->roll();
+     imu_msg.imu.ypr.y = imuData->pitch();
+@@ -239,13 +237,18 @@ void VescDriver::vescPacketCallback(const std::shared_ptr<VescPacket const> & pa
+     imu_msg.imu.orientation.y = imuData->q_y();
+     imu_msg.imu.orientation.z = imuData->q_z();
+ 
+-    std_imu_msg.linear_acceleration.x = imuData->acc_x();
+-    std_imu_msg.linear_acceleration.y = imuData->acc_y();
+-    std_imu_msg.linear_acceleration.z = imuData->acc_z();
++    // sensor_msgs/Imu requires acceleration in m/s^2 and angular velocity in
++    // rad/s. The VESC reports these fields in g and deg/s respectively.
++    constexpr double kStandardGravity = 9.80665;
++    constexpr double kDegreesToRadians = 0.017453292519943295;
++
++    std_imu_msg.linear_acceleration.x = imuData->acc_x() * kStandardGravity;
++    std_imu_msg.linear_acceleration.y = imuData->acc_y() * kStandardGravity;
++    std_imu_msg.linear_acceleration.z = imuData->acc_z() * kStandardGravity;
+ 
+-    std_imu_msg.angular_velocity.x = imuData->gyr_x();
+-    std_imu_msg.angular_velocity.y = imuData->gyr_y();
+-    std_imu_msg.angular_velocity.z = imuData->gyr_z();
++    std_imu_msg.angular_velocity.x = imuData->gyr_x() * kDegreesToRadians;
++    std_imu_msg.angular_velocity.y = imuData->gyr_y() * kDegreesToRadians;
++    std_imu_msg.angular_velocity.z = imuData->gyr_z() * kDegreesToRadians;
+ 
+     std_imu_msg.orientation.w = imuData->q_w();
+     std_imu_msg.orientation.x = imuData->q_x();

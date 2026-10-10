@@ -116,7 +116,8 @@ Observed results:
 - LiDAR after troubleshooting: 10.002, 10.005, and 10.003 Hz.
 - Occupancy grid: 1.000 Hz.
 - Cartographer subscribed to both sensor topics.
-- The `map -> base_link` transform became available and updated continuously.
+- The composed `map -> base_link` transform became available and updated continuously.
+  With `provide_odom_frame = true`, the actual published chain is `map -> odom -> base_link`.
 
 For RViz 2, use `map` as the fixed frame and display `/map`, `/scan`, and TF.
 
@@ -130,3 +131,10 @@ For RViz 2, use `map` as the fixed frame and display `/map`, `/scan`, and TF.
 
 The corresponding experiment log is stored in
 [`docs/research/2026-10-01-personal-research-journal.pdf`](research/2026-10-01-personal-research-journal.pdf).
+
+## Weekly follow-up
+
+See the [October 5-10 weekly record](research/2026-10-10-weekly-improvements.md) for
+code provenance, configurable odometry deadband, USB diagnostics, and the next velocity
+estimation experiment. Cartographer currently owns both dynamic TF links; keep VESC
+`publish_tf = false` and use a separate comparison topic for VESC odometry.

@@ -10,7 +10,7 @@ real-time vehicle pose and occupancy grid for RViz 2.
 - VESC IMU published as `sensor_msgs/msg/Imu` on `/sensors/imu/raw` at approximately 50 Hz.
 - Hokuyo LiDAR published as `sensor_msgs/msg/LaserScan` on `/scan` at approximately 10 Hz.
 - Static transforms connect `base_link` to the `imu` and `laser` sensor frames.
-- Cartographer consumes both sensor streams and publishes the `map -> base_link` transform.
+- Cartographer consumes both sensor streams and publishes `map -> odom -> base_link` TF (the composed transform gives vehicle pose).
 - The occupancy grid is published on `/map` at 1 Hz for real-time RViz 2 visualization.
 - VESC acceleration and angular velocity are converted to ROS-standard units: m/s^2 and rad/s.
 
@@ -48,6 +48,8 @@ flowchart LR
 | `src/map_to_centerline` | Centerline extraction from a saved map |
 | `docs/OPERATIONS.md` | Build, launch, validation, mapping, and driving commands |
 | `docs/IMU_LIDAR_CARTOGRAPHER.md` | Sensor-fusion changes, rationale, results, and limits |
+| `docs/research/2026-10-10-weekly-improvements.md` | Weekly architecture, change locations, code excerpts, and velocity plan |
+| `docs/research/2026-10-10-code-diff.patch` | Exact new code/config changes against the reviewed base |
 
 ## Requirements
 
@@ -99,10 +101,17 @@ RViz checks, map saving, centerline generation, teleoperation, and pure pursuit.
 | Occupancy grid `/map` | 1.000 Hz | Stable |
 
 Cartographer was observed subscribing to both `/scan` and `/sensors/imu/raw`, while the
-`map -> base_link` transform updated continuously. Controlled motion tests are still needed
-to quantify pose drift, latency, and improvement over LiDAR-only localization.
+`map -> base_link` transform updated continuously. The documented sensor, TF, frequency,
+deadband, and USB-port changes were validated on the vehicle under Linux. Quantitative
+evaluation of the planned Cartographer-derived velocity estimator remains next-stage work.
 
 ## Research record
+
+[Weekly improvements (October 5-10, 2026)](docs/research/2026-10-10-weekly-improvements.md)
+consolidates existing sensor integration with configurable low-speed odometry, USB identification,
+and the next Cartographer-only velocity experiment. Historical measurements are distinguished
+from changes that still need Jetson validation.
+
 
 The detailed October 1, 2026 experiment log is available as a
 [Personal Research Journal PDF](docs/research/2026-10-01-personal-research-journal.pdf).
